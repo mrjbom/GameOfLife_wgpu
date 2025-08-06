@@ -74,7 +74,8 @@ fn create_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Window> {
     let window_attributes = WindowAttributes::default()
         .with_min_inner_size(PhysicalSize::new(1, 1))
         .with_inner_size(window_size)
-        .with_position(window_position);
+        .with_position(window_position)
+        .with_visible(false);
 
     event_loop
         .create_window(window_attributes)

@@ -1,6 +1,18 @@
 mod graphics_context;
 
+use bytemuck::Pod;
+use bytemuck::Zeroable;
 use graphics_context::GraphicsContext;
+use std::borrow::Cow;
+use wgpu::naga::ShaderStage;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::{
+    Buffer, BufferAddress, BufferUsages, Color, ColorTargetState, ColorWrites,
+    CommandEncoderDescriptor, FragmentState, FrontFace, LoadOp, Operations, PrimitiveState,
+    PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderSource, StoreOp,
+    VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -9,6 +21,7 @@ use winit::window::WindowId;
 #[derive(Default)]
 struct App {
     graphics_context: Option<GraphicsContext>,
+    app_context: Option<AppContext>,
 }
 
 impl ApplicationHandler for App {
@@ -25,14 +38,27 @@ impl ApplicationHandler for App {
                 return;
             }
         };
+
+        let app_context = match AppContext::new(&graphics_context) {
+            Ok(app_context) => app_context,
+            Err(err) => {
+                log::error!("Failed to create app context: {err:#}");
+                event_loop.exit();
+                return;
+            }
+        };
+
+        graphics_context.window.set_visible(true);
+
         self.graphics_context = Some(graphics_context);
+        self.app_context = Some(app_context);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         let graphics_context = self.graphics_context.as_mut().unwrap();
         match event {
             WindowEvent::RedrawRequested => {
-                graphics_context.window.request_redraw();
+                self.render();
             }
             WindowEvent::Resized(new_size) => {
                 graphics_context
@@ -41,10 +67,201 @@ impl ApplicationHandler for App {
                 graphics_context.window.request_redraw();
             }
             WindowEvent::CloseRequested => {
+                graphics_context.window.set_visible(false);
                 event_loop.exit();
             }
             _ => (),
         }
+    }
+}
+
+impl App {
+    pub fn render(&mut self) {
+        let graphics_context = self.graphics_context.as_mut().unwrap();
+        let app_context = self.app_context.as_mut().unwrap();
+        let (surface_texture, surface_texture_view) = graphics_context.surface_data.acquire();
+
+        let mut command_encoder = graphics_context
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor::default());
+        {
+            let mut render_pass = command_encoder.begin_render_pass(&RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &surface_texture_view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_vertex_buffer(0, app_context.vertex_buffer.slice(..));
+            render_pass.set_pipeline(&app_context.render_pipeline);
+            render_pass.draw(0..3, 0..1);
+        }
+        let command_buffer = command_encoder.finish();
+        graphics_context.queue.submit([command_buffer]);
+        graphics_context.window.pre_present_notify();
+        surface_texture.present();
+        graphics_context.window.request_redraw();
+    }
+}
+
+struct AppContext {
+    #[allow(unused)]
+    vertex_shader: ShaderModule,
+    #[allow(unused)]
+    fragment_shader: ShaderModule,
+    vertex_buffer: Buffer,
+    render_pipeline: RenderPipeline,
+}
+
+impl AppContext {
+    pub fn new(graphics_context: &GraphicsContext) -> anyhow::Result<Self> {
+        // Shaders
+        let vertex_shader = graphics_context
+            .device
+            .create_shader_module(ShaderModuleDescriptor {
+                label: None,
+                source: ShaderSource::Glsl {
+                    shader: Cow::Borrowed(
+                        r#"
+                    #version 460
+
+                    layout(location = 0) in vec3 in_Position;
+                    layout(location = 1) in vec4 in_Color;
+                    out vec4 out_Color;
+
+                    void main() {
+                        gl_Position = vec4(in_Position, 1.0);
+                        out_Color = in_Color;
+                    }
+                "#,
+                    ),
+                    stage: ShaderStage::Vertex,
+                    defines: Default::default(),
+                },
+            });
+        let fragment_shader =
+            graphics_context
+                .device
+                .create_shader_module(ShaderModuleDescriptor {
+                    label: None,
+                    source: ShaderSource::Glsl {
+                        shader: Cow::Borrowed(
+                            r#"
+                    #version 460
+
+                    in vec4 out_Color;
+                    out vec4 frag_Color;
+
+                    void main() {
+                        frag_Color = out_Color;
+                    }
+                "#,
+                        ),
+                        stage: ShaderStage::Fragment,
+                        defines: Default::default(),
+                    },
+                });
+
+        // Vertex buffer
+        #[repr(C)]
+        #[derive(Pod, Zeroable, Clone, Copy)]
+        struct Vertex {
+            position: [f32; 3],
+            color: [f32; 3],
+        }
+
+        let vertexes = vec![
+            Vertex {
+                position: [0.0, 0.5, 0.0],
+                color: [1.0, 0.0, 0.0],
+            },
+            Vertex {
+                position: [0.5, -0.5, 0.0],
+                color: [0.0, 1.0, 0.0],
+            },
+            Vertex {
+                position: [-0.5, -0.5, 0.0],
+                color: [0.0, 0.0, 1.0],
+            },
+        ];
+        let vertex_buffer = graphics_context
+            .device
+            .create_buffer_init(&BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&vertexes),
+                usage: BufferUsages::VERTEX,
+            });
+
+        // Render Pipeline
+        let render_pipeline =
+            graphics_context
+                .device
+                .create_render_pipeline(&RenderPipelineDescriptor {
+                    label: None,
+                    layout: None,
+                    vertex: VertexState {
+                        module: &vertex_shader,
+                        entry_point: Some("main"),
+                        compilation_options: Default::default(),
+                        buffers: &[VertexBufferLayout {
+                            array_stride: size_of::<Vertex>() as BufferAddress,
+                            step_mode: VertexStepMode::Vertex,
+                            attributes: &[
+                                VertexAttribute {
+                                    format: VertexFormat::Float32x3,
+                                    offset: 0,
+                                    shader_location: 0,
+                                },
+                                VertexAttribute {
+                                    format: VertexFormat::Float32x3,
+                                    offset: 4 * 3,
+                                    shader_location: 1,
+                                },
+                            ],
+                        }],
+                    },
+                    primitive: PrimitiveState {
+                        topology: PrimitiveTopology::TriangleList,
+                        strip_index_format: None,
+                        front_face: FrontFace::Cw,
+                        cull_mode: None,
+                        unclipped_depth: false,
+                        polygon_mode: Default::default(),
+                        conservative: false,
+                    },
+                    depth_stencil: None,
+                    multisample: Default::default(),
+                    fragment: Some(FragmentState {
+                        module: &fragment_shader,
+                        entry_point: Some("main"),
+                        compilation_options: Default::default(),
+                        targets: &[Some(ColorTargetState {
+                            format: graphics_context
+                                .surface_data
+                                .surface_configuration
+                                .view_formats[0],
+                            blend: None,
+                            write_mask: ColorWrites::all(),
+                        })],
+                    }),
+                    multiview: None,
+                    cache: None,
+                });
+
+        Ok(Self {
+            vertex_shader,
+            fragment_shader,
+            vertex_buffer,
+            render_pipeline,
+        })
     }
 }
 
