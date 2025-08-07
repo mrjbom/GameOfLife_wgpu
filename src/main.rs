@@ -1,20 +1,24 @@
+mod camera;
 mod graphics_context;
 
-use bytemuck::Pod;
+use crate::camera::Camera;
 use bytemuck::Zeroable;
+use bytemuck::{Pod, bytes_of};
 use graphics_context::GraphicsContext;
+use nalgebra::{Matrix4, Vector2, Vector3};
 use std::borrow::Cow;
 use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
     Buffer, BufferAddress, BufferUsages, Color, ColorTargetState, ColorWrites,
-    CommandEncoderDescriptor, FragmentState, FrontFace, LoadOp, Operations, PrimitiveState,
-    PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderSource, StoreOp,
-    VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    CommandEncoderDescriptor, FragmentState, FrontFace, LoadOp, Operations,
+    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, PushConstantRange,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModule, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp, VertexAttribute,
+    VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{DeviceEvent, DeviceId, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
@@ -22,6 +26,13 @@ use winit::window::WindowId;
 struct App {
     graphics_context: Option<GraphicsContext>,
     app_context: Option<AppContext>,
+    input_status: Option<InputStatus>,
+}
+
+#[derive(Default)]
+struct InputStatus {
+    cursor_in_window: bool,
+    lmb_is_pressed: bool,
 }
 
 impl ApplicationHandler for App {
@@ -52,23 +63,60 @@ impl ApplicationHandler for App {
 
         self.graphics_context = Some(graphics_context);
         self.app_context = Some(app_context);
+        self.input_status = Some(InputStatus::default());
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         let graphics_context = self.graphics_context.as_mut().unwrap();
+        let app_context = self.app_context.as_mut().unwrap();
+        let input_status = self.input_status.as_mut().unwrap();
         match event {
             WindowEvent::RedrawRequested => {
                 self.render();
             }
             WindowEvent::Resized(new_size) => {
+                let new_width = new_size.width.max(1);
+                let new_height = new_size.height.max(1);
                 graphics_context
                     .surface_data
-                    .configure(new_size.width.max(1), new_size.height.max(1));
+                    .configure(new_width, new_height);
+                app_context.camera.resize(new_width, new_height);
                 graphics_context.window.request_redraw();
             }
             WindowEvent::CloseRequested => {
                 graphics_context.window.set_visible(false);
                 event_loop.exit();
+            }
+            WindowEvent::CursorEntered { .. } => {
+                input_status.cursor_in_window = true;
+            }
+            WindowEvent::CursorLeft { .. } => {
+                input_status.cursor_in_window = false;
+            }
+            WindowEvent::MouseInput { button, state, .. } => {
+                if button == MouseButton::Left && state.is_pressed() {
+                    input_status.lmb_is_pressed = true;
+                }
+                if button == MouseButton::Left && !state.is_pressed() {
+                    input_status.lmb_is_pressed = false;
+                }
+            }
+            _ => (),
+        }
+    }
+
+    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
+        let app_context = self.app_context.as_mut().unwrap();
+        let input_status = self.input_status.as_mut().unwrap();
+        match event {
+            DeviceEvent::MouseMotion {
+                delta: (delta_x, delta_y),
+            } => {
+                if input_status.cursor_in_window && input_status.lmb_is_pressed {
+                    app_context
+                        .camera
+                        .process_mouse_motion(delta_x as f32, delta_y as f32);
+                }
             }
             _ => (),
         }
@@ -86,7 +134,6 @@ impl App {
             .create_command_encoder(&CommandEncoderDescriptor::default());
         {
             let mut render_pass = command_encoder.begin_render_pass(&RenderPassDescriptor {
-                label: None,
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &surface_texture_view,
                     depth_slice: None,
@@ -96,12 +143,17 @@ impl App {
                         store: StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
+                ..Default::default()
             });
+
+            let view_projection_matrix = app_context.camera.calculate_view_projection_matrix();
+            let model_matrix =
+                Matrix4::<f32>::identity().append_nonuniform_scaling(&Vector3::new(32., 32., 1.));
+            let mvp_matrix = view_projection_matrix * model_matrix;
+
             render_pass.set_vertex_buffer(0, app_context.vertex_buffer.slice(..));
             render_pass.set_pipeline(&app_context.render_pipeline);
+            render_pass.set_push_constants(ShaderStages::VERTEX, 0, bytes_of(&mvp_matrix));
             render_pass.draw(0..3, 0..1);
         }
         let command_buffer = command_encoder.finish();
@@ -113,6 +165,7 @@ impl App {
 }
 
 struct AppContext {
+    camera: Camera,
     #[allow(unused)]
     vertex_shader: ShaderModule,
     #[allow(unused)]
@@ -135,10 +188,13 @@ impl AppContext {
 
                     layout(location = 0) in vec3 in_Position;
                     layout(location = 1) in vec4 in_Color;
+                    layout(push_constant) uniform PushConstants {
+                        mat4 mvp_matrix;
+                    } p_c;
                     out vec4 out_Color;
 
                     void main() {
-                        gl_Position = vec4(in_Position, 1.0);
+                        gl_Position = p_c.mvp_matrix * vec4(in_Position, 1.0);
                         out_Color = in_Color;
                     }
                 "#,
@@ -206,7 +262,15 @@ impl AppContext {
                 .device
                 .create_render_pipeline(&RenderPipelineDescriptor {
                     label: None,
-                    layout: None,
+                    layout: Some(&graphics_context.device.create_pipeline_layout(
+                        &PipelineLayoutDescriptor {
+                            push_constant_ranges: &[PushConstantRange {
+                                stages: ShaderStages::VERTEX,
+                                range: 0..64,
+                            }],
+                            ..Default::default()
+                        },
+                    )),
                     vertex: VertexState {
                         module: &vertex_shader,
                         entry_point: Some("main"),
@@ -256,7 +320,11 @@ impl AppContext {
                     cache: None,
                 });
 
+        let viewport_width = graphics_context.window.inner_size().width;
+        let viewport_height = graphics_context.window.inner_size().height;
+
         Ok(Self {
+            camera: Camera::new(viewport_width, viewport_height),
             vertex_shader,
             fragment_shader,
             vertex_buffer,

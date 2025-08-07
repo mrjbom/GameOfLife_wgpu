@@ -1,5 +1,5 @@
 [package]
-name = "game_of_life"
+name = "game_of_life_wgpu"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,3 +11,4 @@ env_logger = "0.11.8"
 log = "0.4.27"
 futures = "0.3.31"
 bytemuck = "1.23.1"
+nalgebra = { version = "0.34.0", features = ["bytemuck"] }

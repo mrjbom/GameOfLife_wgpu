@@ -4,8 +4,8 @@ use crate::graphics_context::surface_data::SurfaceData;
 use anyhow::Context;
 use std::sync::Arc;
 use wgpu::{
-    Adapter, Device, DeviceDescriptor, Instance, InstanceDescriptor, PowerPreference, Queue,
-    RequestAdapterOptions,
+    Adapter, Device, DeviceDescriptor, Features, Instance, InstanceDescriptor, Limits,
+    PowerPreference, Queue, RequestAdapterOptions,
 };
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::ActiveEventLoop;
@@ -36,8 +36,16 @@ impl GraphicsContext {
             }))
             .context("Failed to request adapter")?;
         let (device, queue) =
-            futures::executor::block_on(adapter.request_device(&DeviceDescriptor::default()))
-                .context("Failed to request device and queue")?;
+            futures::executor::block_on(adapter.request_device(&DeviceDescriptor {
+                required_features: Features::default() | Features::PUSH_CONSTANTS,
+                required_limits: Limits {
+                    // 4x4 matrix
+                    max_push_constant_size: 64,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }))
+            .context("Failed to request device and queue")?;
         let device = Arc::new(device);
         let mut surface_data =
             SurfaceData::new(Arc::clone(&window), surface, &adapter, Arc::clone(&device));
