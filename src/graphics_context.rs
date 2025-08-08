@@ -51,7 +51,7 @@ impl GraphicsContext {
         let device = Arc::new(device);
         let mut surface_data =
             SurfaceData::new(Arc::clone(&window), surface, &adapter, Arc::clone(&device));
-        surface_data.configure(window.inner_size().width, window.inner_size().height);
+        surface_data.configure(window.inner_size());
         window.request_redraw();
 
         Ok(GraphicsContext {

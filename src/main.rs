@@ -18,7 +18,7 @@ use wgpu::{
     VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 use winit::application::ApplicationHandler;
-use winit::dpi::PhysicalPosition;
+use winit::dpi::{LogicalSize, PhysicalPosition};
 use winit::event::{MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
@@ -85,12 +85,10 @@ impl ApplicationHandler for App {
                 self.render();
             }
             WindowEvent::Resized(new_size) => {
-                let new_width = new_size.width.max(1);
-                let new_height = new_size.height.max(1);
-                graphics_context
-                    .surface_data
-                    .configure(new_width, new_height);
-                app_context.camera.resize(new_width, new_height);
+                graphics_context.surface_data.configure(new_size);
+                app_context
+                    .camera
+                    .resize(new_size.to_logical(graphics_context.window.scale_factor()));
                 graphics_context.window.request_redraw();
             }
             WindowEvent::CloseRequested => {
@@ -115,7 +113,9 @@ impl ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 input_state.cursor_position = position;
-                app_context.camera.update_cursor_position(position);
+                app_context.camera.update_cursor_position(
+                    position.to_logical(graphics_context.window.scale_factor()),
+                );
             }
             _ => (),
         }
@@ -331,11 +331,11 @@ impl AppContext {
                     cache: None,
                 });
 
-        let viewport_width = graphics_context.window.inner_size().width;
-        let viewport_height = graphics_context.window.inner_size().height;
+        let scale_factor = graphics_context.window.scale_factor();
 
         Ok(Self {
-            camera: Camera::new(viewport_width, viewport_height),
+            //camera: Camera::new(graphics_context.window.inner_size().to_logical(scale_factor), scale_factor),
+            camera: Camera::new(LogicalSize::new(320, 320), 1.),
             vertex_shader,
             fragment_shader,
             vertex_buffer,

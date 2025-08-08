@@ -4,6 +4,7 @@ use wgpu::{
     SurfaceTexture, TextureAspect, TextureUsages, TextureView, TextureViewDescriptor,
     TextureViewDimension,
 };
+use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 pub struct SurfaceData {
@@ -66,9 +67,9 @@ impl SurfaceData {
         }
     }
 
-    pub fn configure(&mut self, width: u32, height: u32) {
-        self.surface_configuration.width = width.max(1);
-        self.surface_configuration.height = height.max(1);
+    pub fn configure(&mut self, viewport_size: PhysicalSize<u32>) {
+        self.surface_configuration.width = viewport_size.width.max(1);
+        self.surface_configuration.height = viewport_size.height.max(1);
 
         self.surface
             .configure(&self.device, &self.surface_configuration);
@@ -76,10 +77,7 @@ impl SurfaceData {
 
     pub fn acquire(&mut self) -> (SurfaceTexture, TextureView) {
         if self.suboptimal {
-            self.configure(
-                self.window.inner_size().width.max(1),
-                self.window.inner_size().height.max(1),
-            );
+            self.configure(self.window.inner_size());
         }
         self.suboptimal = false;
 
@@ -98,7 +96,7 @@ impl SurfaceData {
                 // If OutOfMemory happens, reconfiguring may not help, but we might as well try
                 | SurfaceError::OutOfMemory,
             ) => {
-                self.configure(self.window.inner_size().width.max(1), self.window.inner_size().height.max(1));
+                self.configure(self.window.inner_size());
                 self.surface
                     .get_current_texture()
                     .expect("Failed to acquire next surface texture")

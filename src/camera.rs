@@ -2,25 +2,27 @@
 
 use float_cmp::approx_eq;
 use nalgebra::{Matrix4, Vector2, Vector3};
-use winit::dpi::PhysicalPosition;
+use winit::dpi::{LogicalPosition, LogicalSize};
 
 #[derive(Debug)]
 pub struct Camera {
     position: Vector2<f32>,
     zoom: f32,
-    viewport_size: Vector2<u32>,
+    viewport_size: LogicalSize<u32>,
+    scale_factor: f32,
     lmb_is_pressed: bool,
-    cursor_position: PhysicalPosition<f64>,
+    cursor_position: LogicalPosition<f32>,
 }
 
 impl Camera {
-    pub fn new(viewport_width: u32, viewport_height: u32) -> Self {
+    pub fn new(viewport_size: LogicalSize<u32>, scale_factor: f32) -> Self {
         Self {
             position: Vector2::new(0., 0.),
             zoom: 1.,
-            viewport_size: Vector2::new(viewport_width, viewport_height),
-            cursor_position: PhysicalPosition::new(0., 0.),
+            viewport_size,
+            scale_factor,
             lmb_is_pressed: false,
+            cursor_position: LogicalPosition::new(0., 0.),
         }
     }
 
@@ -40,17 +42,17 @@ impl Camera {
         self.zoom = zoom
     }
 
-    pub fn viewport_size(&self) -> Vector2<u32> {
+    pub fn viewport_size(&self) -> LogicalSize<u32> {
         self.viewport_size
     }
 
-    pub fn set_viewport_size(&mut self, viewport_size: Vector2<u32>) {
+    pub fn set_viewport_size(&mut self, viewport_size: LogicalSize<u32>) {
         self.viewport_size = viewport_size
     }
 
     pub fn calculate_view_projection_matrix(&self) -> Matrix4<f32> {
-        let half_w = (self.viewport_size.x as f32) / (2.0 * self.zoom);
-        let half_h = (self.viewport_size.y as f32) / (2.0 * self.zoom);
+        let half_w = (self.viewport_size.width as f32) / (2.0 * self.zoom);
+        let half_h = (self.viewport_size.height as f32) / (2.0 * self.zoom);
 
         let left = -half_w;
         let right = half_w;
@@ -63,31 +65,31 @@ impl Camera {
         proj * view
     }
 
-    pub fn screen_to_world(&self, screen_pos: Vector2<f64>) -> Vector2<f32> {
+    pub fn screen_to_world(&self, screen_pos: LogicalPosition<f32>) -> Vector2<f32> {
+        let screen_pos = Vector2::new(screen_pos.x, screen_pos.y);
         let screen_center = Vector2::new(
-            self.viewport_size.x as f32 / 2.0,
-            self.viewport_size.y as f32 / 2.0,
+            self.viewport_size.width as f32 / 2.0,
+            self.viewport_size.height as f32 / 2.0,
         );
 
-        let screen_offset = screen_pos.cast() - screen_center;
+        let screen_offset = screen_pos - screen_center;
         let mut world_offset = screen_offset / self.zoom;
         world_offset.y = -world_offset.y;
 
         self.position + world_offset
     }
 
-    pub fn resize(&mut self, viewport_width: u32, viewport_height: u32) {
-        self.viewport_size.x = viewport_width;
-        self.viewport_size.y = viewport_height;
+    pub fn resize(&mut self, viewport_size: LogicalSize<u32>) {
+        self.viewport_size = viewport_size;
     }
 
     pub fn update_lmb_state(&mut self, lmb_is_pressed: bool) {
         self.lmb_is_pressed = lmb_is_pressed;
     }
 
-    pub fn update_cursor_position(&mut self, cursor_position: PhysicalPosition<f64>) {
-        if approx_eq!(f64, self.cursor_position.x, 0.)
-            && approx_eq!(f64, self.cursor_position.y, 0.)
+    pub fn update_cursor_position(&mut self, cursor_position: LogicalPosition<f32>) {
+        if approx_eq!(f32, self.cursor_position.x, 0.)
+            && approx_eq!(f32, self.cursor_position.y, 0.)
             && self.lmb_is_pressed
         {
             self.cursor_position = cursor_position;
