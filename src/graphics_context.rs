@@ -13,7 +13,9 @@ use winit::window::{Window, WindowAttributes};
 
 pub struct GraphicsContext {
     pub window: Arc<Window>,
+    #[allow(unused)]
     pub instance: Instance,
+    #[allow(unused)]
     pub adapter: Adapter,
     pub device: Arc<Device>,
     pub queue: Queue,

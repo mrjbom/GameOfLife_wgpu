@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use wgpu::{
-    Adapter, CompositeAlphaMode, Device, PresentMode, Surface, SurfaceCapabilities,
-    SurfaceConfiguration, SurfaceError, SurfaceTexture, TextureAspect, TextureUsages, TextureView,
-    TextureViewDescriptor, TextureViewDimension,
+    Adapter, CompositeAlphaMode, Device, PresentMode, Surface, SurfaceConfiguration, SurfaceError,
+    SurfaceTexture, TextureAspect, TextureUsages, TextureView, TextureViewDescriptor,
+    TextureViewDimension,
 };
 use winit::window::Window;
 
@@ -10,7 +10,6 @@ pub struct SurfaceData {
     window: Arc<Window>,
     surface: Surface<'static>,
     device: Arc<Device>,
-    capabilities: SurfaceCapabilities,
     pub surface_configuration: SurfaceConfiguration,
     suboptimal: bool,
 }
@@ -62,7 +61,6 @@ impl SurfaceData {
             window,
             surface,
             device,
-            capabilities,
             surface_configuration,
             suboptimal: false,
         }

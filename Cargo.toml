@@ -12,3 +12,4 @@ log = "0.4.27"
 futures = "0.3.31"
 bytemuck = "1.23.1"
 nalgebra = { version = "0.34.0", features = ["bytemuck"] }
+float-cmp = "0.10.0"

@@ -18,7 +18,8 @@ use wgpu::{
     VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 use winit::application::ApplicationHandler;
-use winit::event::{DeviceEvent, DeviceId, MouseButton, WindowEvent};
+use winit::dpi::PhysicalPosition;
+use winit::event::{MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
@@ -26,13 +27,14 @@ use winit::window::WindowId;
 struct App {
     graphics_context: Option<GraphicsContext>,
     app_context: Option<AppContext>,
-    input_status: Option<InputStatus>,
+    input_state: Option<InputState>,
 }
 
-#[derive(Default)]
-struct InputStatus {
+#[derive(Default, Debug)]
+struct InputState {
     cursor_in_window: bool,
     lmb_is_pressed: bool,
+    cursor_position: PhysicalPosition<f64>,
 }
 
 impl ApplicationHandler for App {
@@ -63,13 +65,21 @@ impl ApplicationHandler for App {
 
         self.graphics_context = Some(graphics_context);
         self.app_context = Some(app_context);
-        self.input_status = Some(InputStatus::default());
+        self.input_state = Some(InputState::default());
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        if window_id != self.graphics_context.as_ref().unwrap().window.id() {
+            return;
+        }
         let graphics_context = self.graphics_context.as_mut().unwrap();
         let app_context = self.app_context.as_mut().unwrap();
-        let input_status = self.input_status.as_mut().unwrap();
+        let input_state = self.input_state.as_mut().unwrap();
         match event {
             WindowEvent::RedrawRequested => {
                 self.render();
@@ -88,35 +98,24 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::CursorEntered { .. } => {
-                input_status.cursor_in_window = true;
+                input_state.cursor_in_window = true;
             }
             WindowEvent::CursorLeft { .. } => {
-                input_status.cursor_in_window = false;
+                input_state.cursor_in_window = false;
             }
             WindowEvent::MouseInput { button, state, .. } => {
                 if button == MouseButton::Left && state.is_pressed() {
-                    input_status.lmb_is_pressed = true;
+                    input_state.lmb_is_pressed = true;
+                    app_context.camera.update_lmb_state(true);
                 }
                 if button == MouseButton::Left && !state.is_pressed() {
-                    input_status.lmb_is_pressed = false;
+                    input_state.lmb_is_pressed = false;
+                    app_context.camera.update_lmb_state(false);
                 }
             }
-            _ => (),
-        }
-    }
-
-    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
-        let app_context = self.app_context.as_mut().unwrap();
-        let input_status = self.input_status.as_mut().unwrap();
-        match event {
-            DeviceEvent::MouseMotion {
-                delta: (delta_x, delta_y),
-            } => {
-                if input_status.cursor_in_window && input_status.lmb_is_pressed {
-                    app_context
-                        .camera
-                        .process_mouse_motion(delta_x as f32, delta_y as f32);
-                }
+            WindowEvent::CursorMoved { position, .. } => {
+                input_state.cursor_position = position;
+                app_context.camera.update_cursor_position(position);
             }
             _ => (),
         }
@@ -154,7 +153,7 @@ impl App {
             render_pass.set_vertex_buffer(0, app_context.vertex_buffer.slice(..));
             render_pass.set_pipeline(&app_context.render_pipeline);
             render_pass.set_push_constants(ShaderStages::VERTEX, 0, bytes_of(&mvp_matrix));
-            render_pass.draw(0..3, 0..1);
+            render_pass.draw(0..6, 0..1);
         }
         let command_buffer = command_encoder.finish();
         graphics_context.queue.submit([command_buffer]);
@@ -236,8 +235,20 @@ impl AppContext {
 
         let vertexes = vec![
             Vertex {
-                position: [0.0, 0.5, 0.0],
-                color: [1.0, 0.0, 0.0],
+                position: [-0.5, 0.5, 0.0],
+                color: [0.0, 1.0, 0.0],
+            },
+            Vertex {
+                position: [0.5, 0.5, 0.0],
+                color: [0.0, 1.0, 0.0],
+            },
+            Vertex {
+                position: [-0.5, -0.5, 0.0],
+                color: [0.0, 1.0, 0.0],
+            },
+            Vertex {
+                position: [0.5, 0.5, 0.0],
+                color: [0.0, 1.0, 0.0],
             },
             Vertex {
                 position: [0.5, -0.5, 0.0],
@@ -245,7 +256,7 @@ impl AppContext {
             },
             Vertex {
                 position: [-0.5, -0.5, 0.0],
-                color: [0.0, 0.0, 1.0],
+                color: [0.0, 1.0, 0.0],
             },
         ];
         let vertex_buffer = graphics_context

@@ -1,12 +1,16 @@
 // 2D Camera
 
+use float_cmp::approx_eq;
 use nalgebra::{Matrix4, Vector2, Vector3};
+use winit::dpi::PhysicalPosition;
 
 #[derive(Debug)]
 pub struct Camera {
     position: Vector2<f32>,
     zoom: f32,
     viewport_size: Vector2<u32>,
+    lmb_is_pressed: bool,
+    cursor_position: PhysicalPosition<f64>,
 }
 
 impl Camera {
@@ -15,6 +19,8 @@ impl Camera {
             position: Vector2::new(0., 0.),
             zoom: 1.,
             viewport_size: Vector2::new(viewport_width, viewport_height),
+            cursor_position: PhysicalPosition::new(0., 0.),
+            lmb_is_pressed: false,
         }
     }
 
@@ -74,8 +80,32 @@ impl Camera {
         self.viewport_size.y = viewport_height;
     }
 
-    pub fn process_mouse_motion(&mut self, delta_x: f32, delta_y: f32) {
-        self.position.x += -delta_x;
-        self.position.y += delta_y;
+    pub fn update_lmb_state(&mut self, lmb_is_pressed: bool) {
+        self.lmb_is_pressed = lmb_is_pressed;
+    }
+
+    pub fn update_cursor_position(&mut self, cursor_position: PhysicalPosition<f64>) {
+        if approx_eq!(f64, self.cursor_position.x, 0.)
+            && approx_eq!(f64, self.cursor_position.y, 0.)
+            && self.lmb_is_pressed
+        {
+            self.cursor_position = cursor_position;
+            return;
+        }
+
+        if self.lmb_is_pressed {
+            let old_x = self.cursor_position.x;
+            let old_y = self.cursor_position.y;
+
+            let new_x = cursor_position.x;
+            let new_y = cursor_position.y;
+
+            let delta_x = old_x - new_x;
+            let delta_y = old_y - new_y;
+
+            self.position.x += delta_x as f32;
+            self.position.y -= delta_y as f32;
+        }
+        self.cursor_position = cursor_position;
     }
 }
