@@ -63,14 +63,15 @@ impl Camera {
         proj * view
     }
 
-    fn viewport_to_world(&self, screen_pos: Vector2<f32>) -> Vector2<f32> {
+    pub fn screen_to_world(&self, screen_pos: Vector2<f64>) -> Vector2<f32> {
         let screen_center = Vector2::new(
             self.viewport_size.x as f32 / 2.0,
             self.viewport_size.y as f32 / 2.0,
         );
 
         let screen_offset = screen_pos.cast() - screen_center;
-        let world_offset = screen_offset / self.zoom;
+        let mut world_offset = screen_offset / self.zoom;
+        world_offset.y = -world_offset.y;
 
         self.position + world_offset
     }
