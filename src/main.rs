@@ -12,7 +12,7 @@ use wgpu::{
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalPosition;
-use winit::event::{MouseButton, WindowEvent};
+use winit::event::{MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
@@ -110,6 +110,14 @@ impl ApplicationHandler for App {
                     position.to_logical(graphics_context.window.scale_factor()),
                 );
             }
+            WindowEvent::MouseWheel { delta, .. } => {
+                if let MouseScrollDelta::LineDelta(_, delta_y) = delta {
+                    let zoom_delta = delta_y * 0.1;
+                    app_context.camera.change_zoom(zoom_delta);
+                } else {
+                    unimplemented!("MouseScrollDelta::PixelDelta event unimplemented!");
+                }
+            }
             _ => (),
         }
     }
@@ -119,6 +127,7 @@ impl App {
     pub fn render(&mut self) {
         let graphics_context = self.graphics_context.as_mut().unwrap();
         let app_context = self.app_context.as_mut().unwrap();
+        let input_state = self.input_state.as_ref().unwrap();
         let (surface_texture, surface_texture_view) = graphics_context.surface_data.acquire();
 
         let mut command_encoder = graphics_context
@@ -147,6 +156,18 @@ impl App {
             render_pass.set_pipeline(&app_context.render_pipeline);
             render_pass.set_push_constants(ShaderStages::VERTEX, 0, bytes_of(&mvp_matrix));
             render_pass.draw(0..6, 0..1);
+
+            // Square under cursor
+            /*
+            let cursor_position = input_state.cursor_position.to_logical(graphics_context.window.scale_factor());
+            let cursor_world_position = app_context.camera.screen_to_world_position(cursor_position);
+            let scale = Matrix4::<f32>::identity().append_nonuniform_scaling(&Vector3::new(32., 32., 1.));
+            let translation = Matrix4::<f32>::identity().append_translation(&cursor_world_position.push(0.));
+            let model_matrix = translation * scale;
+            let mvp_matrix = view_projection_matrix * model_matrix;
+            render_pass.set_push_constants(ShaderStages::VERTEX, 0, bytes_of(&mvp_matrix));
+            render_pass.draw(0..6, 0..1);
+             */
         }
         let command_buffer = command_encoder.finish();
         graphics_context.queue.submit([command_buffer]);

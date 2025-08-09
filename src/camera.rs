@@ -4,10 +4,16 @@ use float_cmp::approx_eq;
 use nalgebra::{Matrix4, Vector2, Vector3};
 use winit::dpi::{LogicalPosition, LogicalSize};
 
+const ZOOM_MIN: f32 = 0.1;
+const ZOOM_MAX: f32 = 10.;
+
+const ZOOM_DEFAULT_SENSITIVITY: f32 = 0.1;
+
 #[derive(Debug)]
 pub struct Camera {
     position: Vector2<f32>,
     zoom: f32,
+    zoom_sensitivity: f32,
     viewport_size: LogicalSize<u32>,
     scale_factor: f32,
     lmb_is_pressed: bool,
@@ -19,6 +25,7 @@ impl Camera {
         Self {
             position: Vector2::new(0., 0.),
             zoom: 1.,
+            zoom_sensitivity: ZOOM_DEFAULT_SENSITIVITY,
             viewport_size,
             scale_factor,
             lmb_is_pressed: false,
@@ -38,8 +45,25 @@ impl Camera {
         self.zoom
     }
 
-    pub fn set_zoom(&mut self, zoom: f32) {
-        self.zoom = zoom
+    pub fn change_zoom(&mut self, zoom_delta: f32) {
+        let old_zoom = zoom_delta;
+        let new_zoom = (self.zoom + zoom_delta).clamp(ZOOM_MIN, ZOOM_MAX);
+        if approx_eq!(f32, old_zoom, new_zoom) {
+            return;
+        }
+
+        // Zoom changed
+        // For camera zoom on the cursor, we need to move its position
+        let cursor_position = self.cursor_position;
+        let old_cursor_world_position = self.screen_to_world_position(cursor_position);
+        self.zoom = new_zoom;
+        let new_cursor_world_position = self.screen_to_world_position(cursor_position);
+        let cursor_position_delta = new_cursor_world_position - old_cursor_world_position;
+        self.position -= cursor_position_delta;
+    }
+
+    pub fn set_zoom_sensitivity(&mut self, zoom_sensitivity: f32) {
+        self.zoom_sensitivity = zoom_sensitivity;
     }
 
     pub fn viewport_size(&self) -> LogicalSize<u32> {
@@ -65,14 +89,14 @@ impl Camera {
         proj * view
     }
 
-    pub fn screen_to_world(&self, screen_pos: LogicalPosition<f32>) -> Vector2<f32> {
-        let screen_pos = Vector2::new(screen_pos.x, screen_pos.y);
+    pub fn screen_to_world_position(&self, screen_pos: LogicalPosition<f32>) -> Vector2<f32> {
+        let screen_position = Vector2::new(screen_pos.x, screen_pos.y);
         let screen_center = Vector2::new(
             self.viewport_size.width as f32 / 2.0,
             self.viewport_size.height as f32 / 2.0,
         );
 
-        let screen_offset = screen_pos - screen_center;
+        let screen_offset = screen_position - screen_center;
         let mut world_offset = screen_offset / self.zoom;
         world_offset.y = -world_offset.y;
 
@@ -102,8 +126,8 @@ impl Camera {
             let delta_x = old_x - new_x;
             let delta_y = old_y - new_y;
 
-            self.position.x += delta_x;
-            self.position.y -= delta_y;
+            self.position.x += delta_x / self.zoom;
+            self.position.y -= delta_y / self.zoom;
         }
         self.cursor_position = cursor_position;
     }

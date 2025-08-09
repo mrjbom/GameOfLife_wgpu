@@ -180,15 +180,16 @@ impl AppContext {
                 });
 
         let scale_factor = graphics_context.window.scale_factor();
+        let camera = Camera::new(
+            graphics_context
+                .window
+                .inner_size()
+                .to_logical(scale_factor),
+            scale_factor as f32,
+        );
 
         Ok(Self {
-            camera: Camera::new(
-                graphics_context
-                    .window
-                    .inner_size()
-                    .to_logical(scale_factor),
-                scale_factor as f32,
-            ),
+            camera,
             vertex_shader,
             fragment_shader,
             vertex_buffer,
