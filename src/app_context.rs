@@ -10,7 +10,6 @@ use wgpu::{
     RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderSource, ShaderStages,
     VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
-use winit::dpi::LogicalSize;
 
 pub struct AppContext {
     pub(crate) camera: Camera,

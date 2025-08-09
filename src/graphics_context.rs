@@ -24,7 +24,7 @@ pub struct GraphicsContext {
 
 impl GraphicsContext {
     pub fn new(event_loop: &ActiveEventLoop) -> anyhow::Result<Self> {
-        let window = Arc::new(create_window(&event_loop)?);
+        let window = Arc::new(create_window(event_loop)?);
 
         let instance = Instance::new(&InstanceDescriptor::default());
         let surface = instance
