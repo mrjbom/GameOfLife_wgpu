@@ -79,10 +79,6 @@ impl Camera {
         self.position + world_offset
     }
 
-    pub fn resize(&mut self, viewport_size: LogicalSize<u32>) {
-        self.viewport_size = viewport_size;
-    }
-
     pub fn update_lmb_state(&mut self, lmb_is_pressed: bool) {
         self.lmb_is_pressed = lmb_is_pressed;
     }
@@ -106,8 +102,8 @@ impl Camera {
             let delta_x = old_x - new_x;
             let delta_y = old_y - new_y;
 
-            self.position.x += delta_x as f32;
-            self.position.y -= delta_y as f32;
+            self.position.x += delta_x;
+            self.position.y -= delta_y;
         }
         self.cursor_position = cursor_position;
     }
