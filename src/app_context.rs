@@ -12,13 +12,13 @@ use wgpu::{
 };
 
 pub struct AppContext {
-    pub(crate) camera: Camera,
+    pub camera: Camera,
     #[allow(unused)]
     vertex_shader: ShaderModule,
     #[allow(unused)]
     fragment_shader: ShaderModule,
-    pub(crate) vertex_buffer: Buffer,
-    pub(crate) render_pipeline: RenderPipeline,
+    pub vertex_buffer: Buffer,
+    pub render_pipeline: RenderPipeline,
 }
 
 impl AppContext {
