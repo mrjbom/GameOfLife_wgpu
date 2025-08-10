@@ -1,22 +1,16 @@
 use crate::camera::Camera;
 use crate::graphics_context::GraphicsContext;
 use bytemuck::{Pod, Zeroable};
-use std::borrow::Cow;
-use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
     Buffer, BufferAddress, BufferUsages, ColorTargetState, ColorWrites, FragmentState, FrontFace,
     PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderSource, ShaderStages,
-    VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    RenderPipelineDescriptor, ShaderStages, VertexAttribute, VertexBufferLayout, VertexFormat,
+    VertexState, VertexStepMode, include_wgsl,
 };
 
 pub struct AppContext {
     pub camera: Camera,
-    #[allow(unused)]
-    vertex_shader: ShaderModule,
-    #[allow(unused)]
-    fragment_shader: ShaderModule,
     pub vertex_buffer: Buffer,
     pub render_pipeline: RenderPipeline,
 }
@@ -24,54 +18,9 @@ pub struct AppContext {
 impl AppContext {
     pub fn new(graphics_context: &GraphicsContext) -> anyhow::Result<Self> {
         // Shaders
-        let vertex_shader = graphics_context
+        let shader_module = graphics_context
             .device
-            .create_shader_module(ShaderModuleDescriptor {
-                label: None,
-                source: ShaderSource::Glsl {
-                    shader: Cow::Borrowed(
-                        r#"
-                    #version 460
-
-                    layout(location = 0) in vec3 in_Position;
-                    layout(location = 1) in vec4 in_Color;
-                    layout(push_constant) uniform PushConstants {
-                        mat4 mvp_matrix;
-                    } p_c;
-                    out vec4 out_Color;
-
-                    void main() {
-                        gl_Position = p_c.mvp_matrix * vec4(in_Position, 1.0);
-                        out_Color = in_Color;
-                    }
-                "#,
-                    ),
-                    stage: ShaderStage::Vertex,
-                    defines: Default::default(),
-                },
-            });
-        let fragment_shader =
-            graphics_context
-                .device
-                .create_shader_module(ShaderModuleDescriptor {
-                    label: None,
-                    source: ShaderSource::Glsl {
-                        shader: Cow::Borrowed(
-                            r#"
-                    #version 460
-
-                    in vec4 out_Color;
-                    out vec4 frag_Color;
-
-                    void main() {
-                        frag_Color = out_Color;
-                    }
-                "#,
-                        ),
-                        stage: ShaderStage::Fragment,
-                        defines: Default::default(),
-                    },
-                });
+            .create_shader_module(include_wgsl!("shaders/vs_fs.wgsl"));
 
         // Vertex buffer
         #[repr(C)]
@@ -131,8 +80,8 @@ impl AppContext {
                         },
                     )),
                     vertex: VertexState {
-                        module: &vertex_shader,
-                        entry_point: Some("main"),
+                        module: &shader_module,
+                        entry_point: Some("vs_main"),
                         compilation_options: Default::default(),
                         buffers: &[VertexBufferLayout {
                             array_stride: size_of::<Vertex>() as BufferAddress,
@@ -163,8 +112,8 @@ impl AppContext {
                     depth_stencil: None,
                     multisample: Default::default(),
                     fragment: Some(FragmentState {
-                        module: &fragment_shader,
-                        entry_point: Some("main"),
+                        module: &shader_module,
+                        entry_point: Some("fs_main"),
                         compilation_options: Default::default(),
                         targets: &[Some(ColorTargetState {
                             format: graphics_context
@@ -185,13 +134,10 @@ impl AppContext {
                 .window
                 .inner_size()
                 .to_logical(scale_factor),
-            scale_factor as f32,
         );
 
         Ok(Self {
             camera,
-            vertex_shader,
-            fragment_shader,
             vertex_buffer,
             render_pipeline,
         })

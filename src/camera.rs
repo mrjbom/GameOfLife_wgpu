@@ -15,19 +15,17 @@ pub struct Camera {
     zoom: f32,
     zoom_sensitivity: f32,
     viewport_size: LogicalSize<u32>,
-    scale_factor: f32,
     lmb_is_pressed: bool,
     cursor_position: LogicalPosition<f32>,
 }
 
 impl Camera {
-    pub fn new(viewport_size: LogicalSize<u32>, scale_factor: f32) -> Self {
+    pub fn new(viewport_size: LogicalSize<u32>) -> Self {
         Self {
             position: Vector2::new(0., 0.),
             zoom: 1.,
             zoom_sensitivity: ZOOM_DEFAULT_SENSITIVITY,
             viewport_size,
-            scale_factor,
             lmb_is_pressed: false,
             cursor_position: LogicalPosition::new(0., 0.),
         }

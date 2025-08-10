@@ -126,7 +126,6 @@ impl App {
     pub fn render(&mut self) {
         let graphics_context = self.graphics_context.as_mut().unwrap();
         let app_context = self.app_context.as_mut().unwrap();
-        let input_state = self.input_state.as_ref().unwrap();
         let (surface_texture, surface_texture_view) = graphics_context.surface_data.acquire();
 
         let mut command_encoder = graphics_context
