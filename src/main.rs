@@ -112,8 +112,7 @@ impl ApplicationHandler for App {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 if let MouseScrollDelta::LineDelta(_, delta_y) = delta {
-                    let zoom_delta = delta_y * 0.1;
-                    app_context.camera.change_zoom(zoom_delta);
+                    app_context.camera.mouse_scroll(delta_y);
                 } else {
                     unimplemented!("MouseScrollDelta::PixelDelta event unimplemented!");
                 }

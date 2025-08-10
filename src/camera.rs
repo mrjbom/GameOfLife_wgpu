@@ -45,9 +45,10 @@ impl Camera {
         self.zoom
     }
 
-    pub fn change_zoom(&mut self, zoom_delta: f32) {
-        let old_zoom = zoom_delta;
-        let new_zoom = (self.zoom + zoom_delta).clamp(ZOOM_MIN, ZOOM_MAX);
+    pub fn mouse_scroll(&mut self, scroll: f32) {
+        let zoom_delta = scroll * self.zoom_sensitivity;
+        let old_zoom = self.zoom;
+        let new_zoom = (old_zoom + zoom_delta).clamp(ZOOM_MIN, ZOOM_MAX);
         if approx_eq!(f32, old_zoom, new_zoom) {
             return;
         }
