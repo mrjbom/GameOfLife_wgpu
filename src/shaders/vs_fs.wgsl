@@ -1,5 +1,5 @@
 struct VertexIn {
-    @location(0) position: vec3<f32>,
+    @location(0) position: vec2<f32>,
     @location(1) color: vec3<f32>,
 }
 
@@ -16,7 +16,7 @@ struct VertexOut {
 
 @vertex
 fn vs_main(vertex_in: VertexIn) -> VertexOut {
-    var out_position = push_constants.mvp_matrix * vec4(vertex_in.position, 1.0);
+    var out_position = push_constants.mvp_matrix * vec4(vertex_in.position, 0.0, 1.0);
     var out_color = vertex_in.color;
 
     var out: VertexOut;
