@@ -14,6 +14,10 @@ struct VertexOut {
     @location(0) color: vec3<f32>,
 }
 
+struct FragmentIn {
+    @location(0) color: vec3<f32>,
+}
+
 @vertex
 fn vs_main(vertex_in: VertexIn) -> VertexOut {
     var out_position = push_constants.mvp_matrix * vec4(vertex_in.position, 0.0, 1.0);
@@ -26,6 +30,6 @@ fn vs_main(vertex_in: VertexIn) -> VertexOut {
 }
 
 @fragment
-fn fs_main(vertex_out: VertexOut) -> @location(0) vec4<f32> {
-    return vec4(vertex_out.color, 1.0);
+fn fs_main(fragment_in: FragmentIn) -> @location(0) vec4<f32> {
+    return vec4(fragment_in.color, 1.0);
 }
