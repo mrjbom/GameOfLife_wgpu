@@ -27,32 +27,39 @@ impl AppContext {
         #[derive(Pod, Zeroable, Clone, Copy)]
         struct Vertex {
             position: [f32; 2],
+            uv: [f32; 2],
             color: [f32; 3],
         }
 
         let vertexes = vec![
             Vertex {
                 position: [-0.5, 0.5],
+                uv: [0.0, 0.0],
                 color: [0.0, 1.0, 0.0],
             },
             Vertex {
                 position: [0.5, 0.5],
+                uv: [1.0, 0.0],
                 color: [0.0, 1.0, 0.0],
             },
             Vertex {
                 position: [-0.5, -0.5],
+                uv: [0.0, 1.0],
                 color: [0.0, 1.0, 0.0],
             },
             Vertex {
                 position: [0.5, 0.5],
+                uv: [1.0, 0.0],
                 color: [0.0, 1.0, 0.0],
             },
             Vertex {
                 position: [0.5, -0.5],
+                uv: [1.0, 1.0],
                 color: [0.0, 1.0, 0.0],
             },
             Vertex {
                 position: [-0.5, -0.5],
+                uv: [0.0, 1.0],
                 color: [0.0, 1.0, 0.0],
             },
         ];
@@ -87,15 +94,23 @@ impl AppContext {
                             array_stride: size_of::<Vertex>() as BufferAddress,
                             step_mode: VertexStepMode::Vertex,
                             attributes: &[
+                                // Position
                                 VertexAttribute {
                                     format: VertexFormat::Float32x2,
                                     offset: 0,
                                     shader_location: 0,
                                 },
+                                // UV
+                                VertexAttribute {
+                                    format: VertexFormat::Float32x2,
+                                    offset: 8,
+                                    shader_location: 1,
+                                },
+                                // Color
                                 VertexAttribute {
                                     format: VertexFormat::Float32x3,
-                                    offset: 4 * 2,
-                                    shader_location: 1,
+                                    offset: 16,
+                                    shader_location: 2,
                                 },
                             ],
                         }],
